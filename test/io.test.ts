@@ -8,7 +8,7 @@ import {
 import { Server } from 'socket.io'
 import { HttpServer } from '@open-draft/test-server/http'
 import { DeferredPromise } from '@open-draft/deferred-promise'
-import { createSocketIoConnection, toSocketIoConnection } from '../src/io'
+import { toSocketIoConnection } from '../src/io'
 
 const interceptor = new WebSocketInterceptor()
 
@@ -32,17 +32,17 @@ afterAll(async () => {
 })
 
 it('intercepts custom outgoing client event', async () => {
-  const { createSocketClient } = await import('./usage')
+  const { createSocketClient } = await import('./socket.io-client')
 
   const eventLog: Array<string> = []
   const outgoingDataPromise = new DeferredPromise<WebSocketRawData>()
 
-  interceptor.once('connection', ({ client }) => {
-    client.on('message', (event) => eventLog.push(event.data))
+  interceptor.once('connection', (connection) => {
+    connection.client.on('message', (event) => eventLog.push(event.data))
 
-    const io = createSocketIoConnection(client)
+    const { client } = toSocketIoConnection(connection)
 
-    io.on('hello', (name) => {
+    client.on('hello', (name) => {
       outgoingDataPromise.resolve(name)
     })
   })
@@ -57,20 +57,18 @@ it('intercepts custom outgoing client event', async () => {
 })
 
 it('sends a mocked custom incoming server event', async () => {
-  const { createSocketClient } = await import('./usage')
+  const { createSocketClient } = await import('./socket.io-client')
 
   const eventLog: Array<string> = []
   const incomingDataPromise = new DeferredPromise<WebSocketRawData>()
 
-  interceptor.once('connection', ({ client }) => {
-    console.log('CONNECT')
+  interceptor.once('connection', (connection) => {
+    connection.client.on('message', (event) => eventLog.push(event.data))
 
-    client.on('message', (event) => eventLog.push(event.data))
+    const { client } = toSocketIoConnection(connection)
 
-    const io = createSocketIoConnection(client)
-
-    io.on('hello', (name) => {
-      io.emit('greetings', `Hello, ${name}!`)
+    client.on('hello', (name) => {
+      client.emit('greetings', `Hello, ${name}!`)
     })
   })
 
@@ -85,7 +83,7 @@ it('sends a mocked custom incoming server event', async () => {
 })
 
 it('intercepts incoming server event', async () => {
-  const { createSocketClient } = await import('./usage')
+  const { createSocketClient } = await import('./socket.io-client')
 
   const incomingServerDataPromise = new DeferredPromise<WebSocketRawData>()
   const incomingClientDataPromise = new DeferredPromise<WebSocketRawData>()
@@ -105,9 +103,9 @@ it('intercepts incoming server event', async () => {
       connection.server.send(event.data)
     })
 
-    const io = createSocketIoConnection(connection.server)
+    const { server } = toSocketIoConnection(connection)
 
-    io.on('greeting', (message) => {
+    server.on('greeting', (message) => {
       incomingServerDataPromise.resolve(message)
     })
   })
@@ -129,7 +127,7 @@ it('intercepts incoming server event', async () => {
 })
 
 it('modifies incoming server event', async () => {
-  const { createSocketClient } = await import('./usage')
+  const { createSocketClient } = await import('./socket.io-client')
 
   const incomingServerDataPromise = new DeferredPromise<WebSocketRawData>()
   const incomingClientDataPromise = new DeferredPromise<WebSocketRawData>()
@@ -148,13 +146,10 @@ it('modifies incoming server event', async () => {
     // Forward the raw outgoing client events.
     // Socket.IO will be encoding/decoding those by itself.
     connection.client.on('message', (event) => {
-      console.log('[i,raw] from client:', event.data)
       connection.server.send(event.data)
     })
 
     io.server.on('greeting', (message) => {
-      console.log('[i] from server:', message)
-
       incomingServerDataPromise.resolve(message)
 
       /**
@@ -175,8 +170,6 @@ it('modifies incoming server event', async () => {
   const ws = createSocketClient(getWsUrl())
   ws.emit('hello', 'John')
   ws.on('greeting', (message) => {
-    console.log('CLIENT greeting', { message })
-
     incomingClientDataPromise.resolve(message)
   })
 

@@ -132,7 +132,7 @@ class SocketIoDuplexConnection {
             pingTimeout: 5000,
           }),
       )
-      this.rawClient.send('40{"sid":"test"}')
+      this.rawClient.send('40' + JSON.stringify({ sid: 'test' }))
     })
 
     this.server = new SocketIoConnection(this.rawServer)

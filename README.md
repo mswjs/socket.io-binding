@@ -30,6 +30,12 @@ interceptor.on('connection', ({ client, server }) => {
 
 > You can also use this package with [Mock Service Worker](https://github.com/mswjs/msw) directly.
 
+## Limitations
+
+This wrapper is not meant to provide full feature parity with the Socket.IO client API. Some features may be missing (like rooms, namespaces, broadcasting). If you rely of any of the missing features, open a pull request and implement it. Thank you.
+
+> Note that feature parity only concerns the _connection wrapper_. You can still use the entire of the Socket.IO feature set in the actual application code.
+
 ## Install
 
 ```sh

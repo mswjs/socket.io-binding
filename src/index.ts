@@ -145,14 +145,12 @@ class SocketIoDuplexConnection {
 /**
  * @example
  * interceptor.on('connection', (connection) => {
- *   const { client, server } = toSocketIoConnection(connection)
+ *   const { client, server } = bind(connection)
  *   client.on('hello', (firstName) => {
  *     client.emit('greetings', `Hello, ${firstName}!`)
  *   })
  * })
  */
-export function toSocketIoConnection(
-  connection: WebSocketEventMap['connection'][0],
-) {
+export function bind(connection: WebSocketEventMap['connection'][0]) {
   return new SocketIoDuplexConnection(connection.client, connection.server)
 }

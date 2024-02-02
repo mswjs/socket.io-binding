@@ -1,6 +1,6 @@
 {
   "type": "module",
-  "name": "socket.io-connection",
+  "name": "@mswjs/socket.io-binding",
   "version": "1.0.0",
   "description": "",
   "main": "./lib/index.js",
@@ -14,9 +14,10 @@
     "socket",
     "websocket",
     "connection",
-    "transport"
+    "binding",
+    "wrapper"
   ],
-  "author": "Artem Zakharchenko",
+  "author": "Artem Zakharchenko <me@kettanaito.com>",
   "license": "MIT",
   "dependencies": {
     "engine.io-parser": "^5.2.1",

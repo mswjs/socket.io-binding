@@ -22,7 +22,7 @@ const decoder = new Decoder()
 type BoundMessageListener = (
   // @ts-expect-error Bug in @types/node: Missing annotation
   event: MessageEvent,
-  ...data: Array<WebSocketRawData>
+  ...data: Array<any>
 ) => void
 
 class SocketIoConnection {
@@ -75,11 +75,11 @@ class SocketIoConnection {
     })
   }
 
-  public send(...data: Array<WebSocketRawData>): void {
+  public send(...data: Array<any>): void {
     this.emit('message', ...data)
   }
 
-  public emit(event: string, ...data: Array<WebSocketRawData>): void {
+  public emit(event: string, ...data: Array<any>): void {
     /**
      * @todo Check if this correctly encodes Blob
      * and ArrayBuffer data.

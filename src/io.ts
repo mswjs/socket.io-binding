@@ -18,18 +18,9 @@ import {
 const encoder = new Encoder()
 const decoder = new Decoder()
 
-Event
-
-type MessageListenerContext = {
-  /**
-   * Original `MessageEvent` instance of the intercepted message.
-   */
-  // @ts-expect-error Bug in @types/node: Missing annotation
-  event: MessageEvent
-}
-
 type BoundMessageListener = (
-  this: MessageListenerContext,
+  // @ts-expect-error Bug in @types/node: Missing annotation
+  event: MessageEvent,
   ...data: Array<WebSocketRawData>
 ) => void
 
@@ -75,12 +66,7 @@ class SocketIoConnection {
           const [sentEvent, ...data] = decodedSocketIoPacket.data
 
           if (sentEvent === event) {
-            /**
-             * @note Bind the listener function to expose the
-             * original MessageEvent instance to the listener.
-             * That way, the message forwarding can be prevented.
-             */
-            listener.apply({ event: messageEvent }, data)
+            listener.call(undefined, messageEvent, ...data)
           }
         })
 

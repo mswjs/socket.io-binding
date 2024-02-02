@@ -128,7 +128,7 @@ it('intercepts incoming server event', async () => {
   })
 })
 
-it.only('modifies incoming server event', async () => {
+it('modifies incoming server event', async () => {
   const { createSocketClient } = await import('./usage')
 
   const incomingServerDataPromise = new DeferredPromise<WebSocketRawData>()

@@ -24,7 +24,7 @@
   },
   "devDependencies": {
     "@open-draft/deferred-promise": "^2.2.0",
-    "@open-draft/test-server": "^0.6.1",
+    "@open-draft/test-server": "^0.6.2",
     "@types/node": "^20.11.16",
     "jsdom": "^24.0.0",
     "socket.io": "^4.7.4",

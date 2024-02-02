@@ -2,7 +2,7 @@ lockfileVersion: 5.4
 
 specifiers:
   '@open-draft/deferred-promise': ^2.2.0
-  '@open-draft/test-server': ^0.6.1
+  '@open-draft/test-server': ^0.6.2
   '@types/node': ^20.11.16
   engine.io-parser: ^5.2.1
   jsdom: ^24.0.0
@@ -19,7 +19,7 @@ dependencies:
 
 devDependencies:
   '@open-draft/deferred-promise': 2.2.0
-  '@open-draft/test-server': 0.6.1
+  '@open-draft/test-server': 0.6.2
   '@types/node': 20.11.16
   jsdom: 24.0.0
   socket.io: 4.7.4
@@ -257,8 +257,8 @@ packages:
     resolution: {integrity: sha512-CecwLWx3rhxVQF6V4bAgPS5t+So2sTbPgAzafKkVizyi7tlwpcFpdFqq+wqF2OwNBmqFuu6tOyouTuxgpMfzmA==}
     dev: true
 
-  /@open-draft/test-server/0.6.1:
-    resolution: {integrity: sha512-/eOet/0rJ14Jt5dUb6uY+Iqsr0LRAgdssrmwxruzJSkS3QCLSpIodG/7jKJmfZvBqAOhrpGyiKrqefKFuaKtpw==}
+  /@open-draft/test-server/0.6.2:
+    resolution: {integrity: sha512-1v5Y3ynnPzwMMyzyYgIep3okW1R1RZSRPa4My2dJG8xDrdndQGibXvwaxjPg22WDU0u+27AaLSMK6kOgEc1C9w==}
     dependencies:
       '@types/body-parser': 1.19.5
       '@types/cors': 2.8.17

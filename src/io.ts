@@ -18,6 +18,12 @@ import {
 const encoder = new Encoder()
 const decoder = new Decoder()
 
+type BoundMessageListener = (
+  // @ts-expect-error Bug in @types/node: Missing annotation
+  event: MessageEvent,
+  ...data: Array<WebSocketRawData>
+) => void
+
 class SocketIoConnection {
   constructor(
     private readonly connection:
@@ -25,13 +31,10 @@ class SocketIoConnection {
       | WebSocketServerConnection,
   ) {}
 
-  public on(
-    event: string,
-    listener: (...data: Array<WebSocketRawData>) => void,
-  ): void {
-    this.connection.on('message', (message) => {
+  public on(event: string, listener: BoundMessageListener): void {
+    this.connection.on('message', (messageEvent) => {
       const engineIoPackets = decodePayload(
-        message.data,
+        messageEvent.data,
         /**
          * @fixme Grab the binary type from somewhere.
          * Can try grabbing it from the WebSocket
@@ -63,7 +66,7 @@ class SocketIoConnection {
           const [sentEvent, ...data] = decodedSocketIoPacket.data
 
           if (sentEvent === event) {
-            listener(...data)
+            listener.call(undefined, messageEvent, ...data)
           }
         })
 

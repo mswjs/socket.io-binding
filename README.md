@@ -20,7 +20,7 @@ interceptor.on('connection', ({ client, server }) => {
 
   const io = toSocketIoConnection({ client, server })
 
-  io.client.on('greeting', (message) => {
+  io.client.on('greeting', (event, message) => {
     // Using the wrapper, you get the decoded messages,
     // as well as support for custom event listeners.
     console.log(message) // "Hello, John!"
@@ -56,7 +56,7 @@ export const handlers = [
   ws.on('connection', ({ client, server }) => {
     const io = toSocketIoConnection({ client, server })
 
-    io.on('hello', (name) => {
+    io.on('hello', (event, name) => {
       console.log('client sent hello:', name)
     })
   }),

@@ -10,7 +10,6 @@ import {
   PacketType as SocketIoPacketType,
 } from 'socket.io-parser'
 import {
-  WebSocketRawData,
   WebSocketEventMap,
   WebSocketClientConnection,
   WebSocketServerConnection,

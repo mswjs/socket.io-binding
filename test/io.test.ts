@@ -149,21 +149,11 @@ it('modifies incoming server event', async () => {
       connection.server.send(event.data)
     })
 
-    io.server.on('greeting', (message) => {
+    io.server.on('greeting', function (message) {
       incomingServerDataPromise.resolve(message)
 
-      /**
-       * @fixme Forward the original "event" instance
-       * so its default can be prevented (cancel forwarding).
-       */
-      /**
-       * @fixme How to prevent forwarding for multi-events?
-       * (e.g. receiving Blob from the server). There will be
-       * multiple "message" events dispatched.
-       */
-
-      // event.preventDefault()
-      // io.client.emit('greeting', { id: 2, text: 'Hello, Sarah!' })
+      this.event.preventDefault()
+      io.client.emit('greeting', { id: 2, text: 'Hello, Sarah!' })
     })
   })
 

@@ -18,6 +18,21 @@ import {
 const encoder = new Encoder()
 const decoder = new Decoder()
 
+Event
+
+type MessageListenerContext = {
+  /**
+   * Original `MessageEvent` instance of the intercepted message.
+   */
+  // @ts-expect-error Bug in @types/node: Missing annotation
+  event: MessageEvent
+}
+
+type BoundMessageListener = (
+  this: MessageListenerContext,
+  ...data: Array<WebSocketRawData>
+) => void
+
 class SocketIoConnection {
   constructor(
     private readonly connection:
@@ -25,13 +40,10 @@ class SocketIoConnection {
       | WebSocketServerConnection,
   ) {}
 
-  public on(
-    event: string,
-    listener: (...data: Array<WebSocketRawData>) => void,
-  ): void {
-    this.connection.on('message', (message) => {
+  public on(event: string, listener: BoundMessageListener): void {
+    this.connection.on('message', (messageEvent) => {
       const engineIoPackets = decodePayload(
-        message.data,
+        messageEvent.data,
         /**
          * @fixme Grab the binary type from somewhere.
          * Can try grabbing it from the WebSocket
@@ -63,7 +75,12 @@ class SocketIoConnection {
           const [sentEvent, ...data] = decodedSocketIoPacket.data
 
           if (sentEvent === event) {
-            listener(...data)
+            /**
+             * @note Bind the listener function to expose the
+             * original MessageEvent instance to the listener.
+             * That way, the message forwarding can be prevented.
+             */
+            listener.apply({ event: messageEvent }, data)
           }
         })
 

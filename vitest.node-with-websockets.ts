@@ -1,5 +1,5 @@
 /**
- * Node.js environment superset that has a global WebSocket API.
+ * JSDOM environment superset that has a global WebSocket API.
  */
 import type { Environment } from 'vitest'
 import { builtinEnvironments } from 'vitest/environments'

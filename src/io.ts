@@ -2,6 +2,7 @@ import {
   encodePayload,
   decodePayload,
   Packet as EngineIoPacket,
+  BinaryType,
 } from 'engine.io-parser'
 import {
   Encoder,
@@ -32,16 +33,15 @@ class SocketIoConnection {
   ) {}
 
   public on(event: string, listener: BoundMessageListener): void {
-    this.connection.on('message', (messageEvent) => {
-      const engineIoPackets = decodePayload(
-        messageEvent.data,
-        /**
-         * @fixme Grab the binary type from somewhere.
-         * Can try grabbing it from the WebSocket
-         * instance but we can't reference it here.
-         */
-        'blob',
-      )
+    this.connection.on('message', function (messageEvent) {
+      const binaryType: BinaryType =
+        this.binaryType === 'blob'
+          ? this.binaryType
+          : typeof Buffer === 'undefined'
+          ? 'arraybuffer'
+          : 'nodebuffer'
+
+      const engineIoPackets = decodePayload(messageEvent.data, binaryType)
 
       /**
        * @todo Check if this works correctly with

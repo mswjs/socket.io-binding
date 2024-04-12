@@ -8,7 +8,7 @@ import {
 import { Server } from 'socket.io'
 import { HttpServer } from '@open-draft/test-server/http'
 import { DeferredPromise } from '@open-draft/deferred-promise'
-import { bind } from '../src/index'
+import { bindConnection } from '../src/index'
 
 const interceptor = new WebSocketInterceptor()
 
@@ -40,7 +40,7 @@ it('intercepts custom outgoing client event', async () => {
   interceptor.once('connection', (connection) => {
     connection.client.on('message', (event) => eventLog.push(event.data))
 
-    const { client } = bind(connection)
+    const { client } = bindConnection(connection)
 
     client.on('hello', (event, name) => {
       outgoingDataPromise.resolve(name)
@@ -65,7 +65,7 @@ it('sends a mocked custom incoming server event', async () => {
   interceptor.once('connection', (connection) => {
     connection.client.on('message', (event) => eventLog.push(event.data))
 
-    const { client } = bind(connection)
+    const { client } = bindConnection(connection)
 
     client.on('hello', (event, name) => {
       client.emit('greetings', `Hello, ${name}!`)
@@ -103,7 +103,7 @@ it('intercepts incoming server event', async () => {
       connection.server.send(event.data)
     })
 
-    const { server } = bind(connection)
+    const { server } = bindConnection(connection)
 
     server.on('greeting', (event, message) => {
       incomingServerDataPromise.resolve(message)
@@ -139,7 +139,7 @@ it('modifies incoming server event', async () => {
   })
 
   interceptor.once('connection', (connection) => {
-    const io = bind(connection)
+    const io = bindConnection(connection)
 
     connection.server.connect()
 

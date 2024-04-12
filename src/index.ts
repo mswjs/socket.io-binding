@@ -10,9 +10,9 @@ import {
   PacketType as SocketIoPacketType,
 } from 'socket.io-parser'
 import {
-  WebSocketEventMap,
   WebSocketClientConnection,
   WebSocketServerConnection,
+  WebSocketConnectionData,
 } from '@mswjs/interceptors/WebSocket'
 
 const encoder = new Encoder()
@@ -37,8 +37,8 @@ class SocketIoConnection {
         this.binaryType === 'blob'
           ? this.binaryType
           : typeof Buffer === 'undefined'
-          ? 'arraybuffer'
-          : 'nodebuffer'
+            ? 'arraybuffer'
+            : 'nodebuffer'
 
       const engineIoPackets = decodePayload(messageEvent.data, binaryType)
 
@@ -145,12 +145,12 @@ class SocketIoDuplexConnection {
 /**
  * @example
  * interceptor.on('connection', (connection) => {
- *   const { client, server } = bind(connection)
+ *   const { client, server } = bindConnection(connection)
  *   client.on('hello', (firstName) => {
  *     client.emit('greetings', `Hello, ${firstName}!`)
  *   })
  * })
  */
-export function bind(connection: WebSocketEventMap['connection'][0]) {
+export function bindConnection(connection: WebSocketConnectionData) {
   return new SocketIoDuplexConnection(connection.client, connection.server)
 }

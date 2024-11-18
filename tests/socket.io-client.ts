@@ -5,7 +5,8 @@
  * goes to "engine.io-client", and uses "ws" for WebSocket class
  * (ignores the global class because assumes itself in Node.js).
  */
-import type { Socket } from 'socket.io-client'
+import { Socket } from 'socket.io-client'
+// @ts-expect-error Socket.IO shenanigans.
 import { io } from 'socket.io-client/dist/socket.io.js'
 
 export function createSocketClient(uri: string): Socket {

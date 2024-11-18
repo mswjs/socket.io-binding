@@ -1,8 +1,0 @@
-{
-  "compilerOptions": {
-    "types": ["@types/node", "vitest/globals"],
-    "noEmit": true,
-    "lib": ["esnext"]
-  },
-  "include": ["../src", "./**/*.ts"]
-}

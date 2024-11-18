@@ -1,10 +1,10 @@
 {
   "type": "module",
   "name": "@mswjs/socket.io-binding",
-  "version": "1.0.0",
-  "description": "",
-  "main": "./lib/index.js",
-  "types": "./lib/index.d.ts",
+  "version": "0.0.0",
+  "description": "Binding to mock Socket.IO connections with Mock Service Worker",
+  "main": "./build/index.js",
+  "types": "./build/index.d.ts",
   "scripts": {
     "test": "vitest"
   },
@@ -17,21 +17,22 @@
     "binding",
     "wrapper"
   ],
-  "author": "Artem Zakharchenko <me@kettanaito.com>",
+  "author": "Artem Zakharchenko <kettanaito@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "engine.io-parser": "^5.2.1",
+    "@mswjs/interceptors": "^0.37.1",
+    "engine.io-parser": "^5.2.3",
     "socket.io-parser": "^4.2.4"
   },
   "devDependencies": {
     "@open-draft/deferred-promise": "^2.2.0",
     "@open-draft/test-server": "^0.6.2",
     "@types/node": "^20.11.16",
-    "jsdom": "^24.0.0",
-    "socket.io": "^4.7.4",
-    "socket.io-client": "^4.7.4",
-    "typescript": "^5.3.3",
-    "undici": "^6.6.0",
-    "vitest": "^1.2.2"
+    "happy-dom": "^15.11.6",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "typescript": "^5.6.3",
+    "undici": "^6.21.0",
+    "vitest": "^2.1.5"
   }
 }

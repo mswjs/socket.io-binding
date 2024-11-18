@@ -1,8 +1,8 @@
 import {
   encodePayload,
   decodePayload,
-  Packet as EngineIoPacket,
-  BinaryType,
+  type Packet as EngineIoPacket,
+  type BinaryType,
 } from 'engine.io-parser'
 import {
   Encoder,
@@ -12,17 +12,13 @@ import {
 import {
   WebSocketClientConnection,
   WebSocketServerConnection,
-  WebSocketConnectionData,
+  type WebSocketConnectionData,
 } from '@mswjs/interceptors/WebSocket'
 
 const encoder = new Encoder()
 const decoder = new Decoder()
 
-type BoundMessageListener = (
-  // @ts-expect-error Bug in @types/node: Missing annotation
-  event: MessageEvent,
-  ...data: Array<any>
-) => void
+type BoundMessageListener = (event: MessageEvent, ...data: Array<any>) => void
 
 class SocketIoConnection {
   constructor(
@@ -32,15 +28,29 @@ class SocketIoConnection {
   ) {}
 
   public on(event: string, listener: BoundMessageListener): void {
-    this.connection.on('message', function (messageEvent) {
+    const addEventListener = this.connection.addEventListener.bind(
+      this.connection,
+    ) as WebSocketClientConnection['addEventListener']
+
+    addEventListener('message', function (messageEvent) {
       const binaryType: BinaryType =
         this.binaryType === 'blob'
           ? this.binaryType
           : typeof Buffer === 'undefined'
-            ? 'arraybuffer'
-            : 'nodebuffer'
+          ? 'arraybuffer'
+          : 'nodebuffer'
 
-      const engineIoPackets = decodePayload(messageEvent.data, binaryType)
+      const rawData = messageEvent.data
+
+      /**
+       * Messages are always decoded as strings.
+       * Technically, it should be safe to skip non-string messages.
+       */
+      if (typeof rawData !== 'string') {
+        return
+      }
+
+      const engineIoPackets = decodePayload(rawData, binaryType)
 
       /**
        * @todo Check if this works correctly with
@@ -89,7 +99,7 @@ class SocketIoConnection {
        * @todo Support custom namespaces.
        */
       nsp: '/',
-      data: [event, ...data],
+      data: [event].concat(data),
     })
 
     const engineIoPackets = encodedSocketIoPacket.map<EngineIoPacket>(
@@ -118,39 +128,43 @@ class SocketIoDuplexConnection {
     readonly rawClient: WebSocketClientConnection,
     readonly rawServer: WebSocketServerConnection,
   ) {
-    // First, decide whether the "open" connection event
-    // and the namespace approval event should be mocked.
     queueMicrotask(() => {
-      if (this.rawServer.readyState !== -1) {
+      try {
+        // Accessing the "socket" property on the server
+        // throws if the actual server connection hasn't been established.
+        // If it doesn't throw, don't mock the namespace approval message.
+        // That becomes the responsibility of the server.
+        this.rawServer.socket.readyState
         return
+      } catch {
+        this.rawClient.send(
+          '0' +
+            JSON.stringify({
+              sid: 'test',
+              upgrades: [],
+              pingInterval: 25000,
+              pingTimeout: 5000,
+            }),
+        )
+        this.rawClient.send('40' + JSON.stringify({ sid: 'test' }))
       }
-
-      this.rawClient.send(
-        '0' +
-          JSON.stringify({
-            sid: 'test',
-            upgrades: [],
-            pingInterval: 25000,
-            pingTimeout: 5000,
-          }),
-      )
-      this.rawClient.send('40' + JSON.stringify({ sid: 'test' }))
     })
 
-    this.server = new SocketIoConnection(this.rawServer)
     this.client = new SocketIoConnection(this.rawClient)
+    this.server = new SocketIoConnection(this.rawServer)
   }
 }
 
 /**
  * @example
  * interceptor.on('connection', (connection) => {
- *   const { client, server } = bindConnection(connection)
+ *   const { client, server } = toSocketIo(connection)
+ *
  *   client.on('hello', (firstName) => {
  *     client.emit('greetings', `Hello, ${firstName}!`)
  *   })
  * })
  */
-export function bindConnection(connection: WebSocketConnectionData) {
+export function toSocketIo(connection: WebSocketConnectionData) {
   return new SocketIoDuplexConnection(connection.client, connection.server)
 }

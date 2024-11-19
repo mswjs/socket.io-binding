@@ -1,12 +1,14 @@
 {
   "type": "module",
   "name": "@mswjs/socket.io-binding",
-  "version": "1.0.0",
+  "version": "0.0.0",
   "description": "",
-  "main": "./lib/index.js",
-  "types": "./lib/index.d.ts",
+  "main": "./build/index.js",
+  "types": "./build/index.d.ts",
   "scripts": {
-    "test": "vitest"
+    "test": "vitest",
+    "build": "TODO",
+    "publish": "release publish"
   },
   "keywords": [
     "msw",
@@ -17,6 +19,9 @@
     "binding",
     "wrapper"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "author": "Artem Zakharchenko <me@kettanaito.com>",
   "license": "MIT",
   "dependencies": {
@@ -26,6 +31,7 @@
   "devDependencies": {
     "@open-draft/deferred-promise": "^2.2.0",
     "@open-draft/test-server": "^0.6.2",
+    "@ossjs/release": "^0.8.1",
     "@types/node": "^20.11.16",
     "jsdom": "^24.0.0",
     "socket.io": "^4.7.4",

@@ -6,7 +6,9 @@
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
   "scripts": {
-    "test": "vitest"
+    "test": "vitest",
+    "build": "tsup",
+    "publish": "release publish"
   },
   "keywords": [
     "msw",
@@ -15,22 +17,31 @@
     "websocket",
     "connection",
     "binding",
-    "wrapper"
+    "mock"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "author": "Artem Zakharchenko <kettanaito@gmail.com>",
   "license": "MIT",
+  "peerDependencies": {
+    "@mswjs/interceptors": "*"
+  },
   "dependencies": {
     "@mswjs/interceptors": "^0.37.1",
     "engine.io-parser": "^5.2.3",
     "socket.io-parser": "^4.2.4"
   },
   "devDependencies": {
+    "@mswjs/interceptors": "^0.37.1",
     "@open-draft/deferred-promise": "^2.2.0",
     "@open-draft/test-server": "^0.6.2",
+    "@ossjs/release": "^0.8.1",
     "@types/node": "^20.11.16",
     "happy-dom": "^15.11.6",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
+    "tsup": "^8.3.5",
     "typescript": "^5.6.3",
     "undici": "^6.21.0",
     "vitest": "^2.1.5"

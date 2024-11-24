@@ -18,11 +18,7 @@ import {
 const encoder = new Encoder()
 const decoder = new Decoder()
 
-type BoundMessageListener = (
-  // @ts-expect-error Bug in @types/node: Missing annotation
-  event: MessageEvent,
-  ...data: Array<any>
-) => void
+type BoundMessageListener = (event: MessageEvent, ...data: Array<any>) => void
 
 class SocketIoConnection {
   constructor(

@@ -7,7 +7,7 @@
   "types": "./build/index.d.ts",
   "scripts": {
     "test": "vitest",
-    "build": "TODO",
+    "build": "tsup",
     "publish": "release publish"
   },
   "keywords": [
@@ -17,18 +17,22 @@
     "websocket",
     "connection",
     "binding",
-    "wrapper"
+    "mock"
   ],
   "publishConfig": {
     "access": "public"
   },
   "author": "Artem Zakharchenko <kettanaito@gmail.com>",
   "license": "MIT",
+  "peerDependencies": {
+    "@mswjs/interceptors": "*"
+  },
   "dependencies": {
     "engine.io-parser": "^5.2.1",
     "socket.io-parser": "^4.2.4"
   },
   "devDependencies": {
+    "@mswjs/interceptors": "^0.37.1",
     "@open-draft/deferred-promise": "^2.2.0",
     "@open-draft/test-server": "^0.6.2",
     "@ossjs/release": "^0.8.1",
@@ -36,6 +40,7 @@
     "jsdom": "^24.0.0",
     "socket.io": "^4.7.4",
     "socket.io-client": "^4.7.4",
+    "tsup": "^8.3.5",
     "typescript": "^5.3.3",
     "undici": "^6.6.0",
     "vitest": "^1.2.2"

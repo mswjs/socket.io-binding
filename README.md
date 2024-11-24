@@ -6,19 +6,19 @@ This package is intended as a wrapper over the `WebSocketInterceptor` from [`@ms
 
 ```js
 import { WebSocketInterceptor } from '@mswjs/interceptor'
-import { bind } from '@mswjs/socket.io-binding'
+import { toSocketIo } from '@mswjs/socket.io-binding'
 
 const interceptor = new WebSocketInterceptor()
 
-interceptor.on('connection', ({ client, server }) => {
-  client.on('message', (event) => {
+interceptor.on('connection', (connection) => {
+  connection.client.addEventListener('message', (event) => {
     // Socket.IO implements their custom messaging protocol.
     // This means that the "raw" event data you get will be
     // encoded: e.g. "40", "42['message', 'Hello, John!']".
     console.log(event.data)
   })
 
-  const io = bind({ client, server })
+  const io = toSocketIo(connection)
 
   io.client.on('greeting', (event, message) => {
     // Using the wrapper, you get the decoded messages,
@@ -39,7 +39,7 @@ This wrapper is not meant to provide full feature parity with the Socket.IO clie
 ## Install
 
 ```sh
-npm i @mswjs/socket.io-binding
+npm install @mswjs/socket.io-binding
 ```
 
 ## Examples
@@ -48,13 +48,13 @@ npm i @mswjs/socket.io-binding
 
 ```js
 import { ws } from 'msw'
-import { bind } from '@mswjs/socket.io-binding'
+import { toSocketIo } from '@mswjs/socket.io-binding'
 
-const chat = ws.url('wss://example.com')
+const chat = ws.link('wss://example.com/chat')
 
 export const handlers = [
-  ws.on('connection', ({ client, server }) => {
-    const io = bind({ client, server })
+  chat.addEventListener('connection', (connection) => {
+    const io = toSocketIo(connection)
 
     io.on('hello', (event, name) => {
       console.log('client sent hello:', name)

@@ -4,8 +4,7 @@ export default defineConfig({
   test: {
     globals: true,
     alias: {
-      'vitest-environment-node-with-websockets':
-        './vitest.node-with-websockets',
+      'vitest-environment-node-websocket': './vitest.node-websocket',
     },
   },
 })

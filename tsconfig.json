@@ -1,12 +1,7 @@
 {
-  "compilerOptions": {
-    "strict": true,
-    "target": "esnext",
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "skipDefaultLibCheck": true,
-    "lib": ["es2022"]
-  },
-  "include": ["src"],
-  "exclude": ["node_modules"],
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.src.json" },
+    { "path": "./tsconfig.test.json" }
+  ]
 }

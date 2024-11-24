@@ -1,14 +1,12 @@
-/**
- * @vitest-environment node-with-websockets
- */
+// @vitest-environment node-websocket
 import {
   WebSocketInterceptor,
-  WebSocketRawData,
+  type WebSocketData,
 } from '@mswjs/interceptors/WebSocket'
 import { Server } from 'socket.io'
 import { HttpServer } from '@open-draft/test-server/http'
 import { DeferredPromise } from '@open-draft/deferred-promise'
-import { bind } from '../src/index'
+import { toSocketIo } from '../src/index.js'
 
 const interceptor = new WebSocketInterceptor()
 
@@ -26,21 +24,27 @@ beforeAll(async () => {
   await httpServer.listen()
 })
 
+afterEach(() => {
+  interceptor.removeAllListeners()
+})
+
 afterAll(async () => {
   interceptor.dispose()
   await httpServer.close()
 })
 
 it('intercepts custom outgoing client event', async () => {
-  const { createSocketClient } = await import('./socket.io-client')
+  const { createSocketClient } = await import('./socket.io-client.js')
 
-  const eventLog: Array<string> = []
-  const outgoingDataPromise = new DeferredPromise<WebSocketRawData>()
+  const eventLog: Array<WebSocketData> = []
+  const outgoingDataPromise = new DeferredPromise<WebSocketData>()
 
-  interceptor.once('connection', (connection) => {
-    connection.client.on('message', (event) => eventLog.push(event.data))
+  interceptor.on('connection', (connection) => {
+    connection.client.addEventListener('message', (event) => {
+      eventLog.push(event.data)
+    })
 
-    const { client } = bind(connection)
+    const { client } = toSocketIo(connection)
 
     client.on('hello', (event, name) => {
       outgoingDataPromise.resolve(name)
@@ -57,15 +61,17 @@ it('intercepts custom outgoing client event', async () => {
 })
 
 it('sends a mocked custom incoming server event', async () => {
-  const { createSocketClient } = await import('./socket.io-client')
+  const { createSocketClient } = await import('./socket.io-client.js')
 
-  const eventLog: Array<string> = []
-  const incomingDataPromise = new DeferredPromise<WebSocketRawData>()
+  const eventLog: Array<WebSocketData> = []
+  const incomingDataPromise = new DeferredPromise<WebSocketData>()
 
-  interceptor.once('connection', (connection) => {
-    connection.client.on('message', (event) => eventLog.push(event.data))
+  interceptor.on('connection', (connection) => {
+    connection.client.addEventListener('message', (event) => {
+      eventLog.push(event.data)
+    })
 
-    const { client } = bind(connection)
+    const { client } = toSocketIo(connection)
 
     client.on('hello', (event, name) => {
       client.emit('greetings', `Hello, ${name}!`)
@@ -83,10 +89,10 @@ it('sends a mocked custom incoming server event', async () => {
 })
 
 it('intercepts incoming server event', async () => {
-  const { createSocketClient } = await import('./socket.io-client')
+  const { createSocketClient } = await import('./socket.io-client.js')
 
-  const incomingServerDataPromise = new DeferredPromise<WebSocketRawData>()
-  const incomingClientDataPromise = new DeferredPromise<WebSocketRawData>()
+  const incomingServerDataPromise = new DeferredPromise<WebSocketData>()
+  const incomingClientDataPromise = new DeferredPromise<WebSocketData>()
 
   wsServer.on('connection', (client) => {
     client.on('hello', (name) => {
@@ -94,16 +100,16 @@ it('intercepts incoming server event', async () => {
     })
   })
 
-  interceptor.once('connection', (connection) => {
+  interceptor.on('connection', (connection) => {
     connection.server.connect()
 
     // Forward the raw outgoing client events
     // to the server to establish a Socket.IO connection.
-    connection.client.on('message', (event) => {
+    connection.client.addEventListener('message', (event) => {
       connection.server.send(event.data)
     })
 
-    const { server } = bind(connection)
+    const { server } = toSocketIo(connection)
 
     server.on('greeting', (event, message) => {
       incomingServerDataPromise.resolve(message)
@@ -127,10 +133,10 @@ it('intercepts incoming server event', async () => {
 })
 
 it('modifies incoming server event', async () => {
-  const { createSocketClient } = await import('./socket.io-client')
+  const { createSocketClient } = await import('./socket.io-client.js')
 
-  const incomingServerDataPromise = new DeferredPromise<WebSocketRawData>()
-  const incomingClientDataPromise = new DeferredPromise<WebSocketRawData>()
+  const incomingServerDataPromise = new DeferredPromise<WebSocketData>()
+  const incomingClientDataPromise = new DeferredPromise<WebSocketData>()
 
   wsServer.on('connection', (client) => {
     client.on('hello', (name) => {
@@ -138,14 +144,14 @@ it('modifies incoming server event', async () => {
     })
   })
 
-  interceptor.once('connection', (connection) => {
-    const io = bind(connection)
+  interceptor.on('connection', (connection) => {
+    const io = toSocketIo(connection)
 
     connection.server.connect()
 
     // Forward the raw outgoing client events.
     // Socket.IO will be encoding/decoding those by itself.
-    connection.client.on('message', (event) => {
+    connection.client.addEventListener('message', (event) => {
       connection.server.send(event.data)
     })
 

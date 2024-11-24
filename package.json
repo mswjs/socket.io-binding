@@ -22,7 +22,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "author": "Artem Zakharchenko <me@kettanaito.com>",
+  "author": "Artem Zakharchenko <kettanaito@gmail.com>",
   "license": "MIT",
   "dependencies": {
     "engine.io-parser": "^5.2.1",

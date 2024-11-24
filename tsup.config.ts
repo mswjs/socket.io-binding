@@ -6,5 +6,6 @@ export default defineConfig({
   outDir: './build',
   clean: true,
   dts: true,
+  tsconfig: './tsconfig.src.json',
   sourcemap: true,
 })

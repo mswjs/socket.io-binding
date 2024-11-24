@@ -1,14 +1,14 @@
 {
   "type": "module",
   "name": "@mswjs/socket.io-binding",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Binding to mock Socket.IO connections with Mock Service Worker",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
   "scripts": {
     "test": "vitest",
     "build": "tsup",
-    "publish": "release publish"
+    "release": "release publish"
   },
   "keywords": [
     "msw",

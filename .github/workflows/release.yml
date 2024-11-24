@@ -45,7 +45,7 @@ jobs:
         run: pnpm test
 
       - name: Publish
-        run: pnpm publish
+        run: pnpm release
         env:
           GITHUB_TOKEN: ${{ secrets.GH_ADMIN_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

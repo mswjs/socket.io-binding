@@ -23,7 +23,8 @@
     "access": "public"
   },
   "files": [
-    "build"
+    "build",
+    "src"
   ],
   "author": "Artem Zakharchenko <kettanaito@gmail.com>",
   "license": "MIT",

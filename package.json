@@ -22,6 +22,9 @@
   "publishConfig": {
     "access": "public"
   },
+  "files": [
+    "build"
+  ],
   "author": "Artem Zakharchenko <kettanaito@gmail.com>",
   "license": "MIT",
   "peerDependencies": {

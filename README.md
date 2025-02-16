@@ -5,7 +5,7 @@
 This package is intended as a wrapper over the `WebSocketInterceptor` from [`@mswjs/interceptors`](https://github.com/mswjs/interceptors). It provides automatic encoding and decoding of messages, letting you work with the Socket.IO clients and servers as you are used to.
 
 ```js
-import { WebSocketInterceptor } from '@mswjs/interceptor'
+import { WebSocketInterceptor } from '@mswjs/interceptors'
 import { toSocketIo } from '@mswjs/socket.io-binding'
 
 const interceptor = new WebSocketInterceptor()

@@ -9,10 +9,10 @@ import {
   Decoder,
   PacketType as SocketIoPacketType,
 } from 'socket.io-parser'
-import {
-  WebSocketClientConnection,
-  WebSocketServerConnection,
-  type WebSocketConnectionData,
+import type { WebSocketHandlerConnection } from 'msw'
+import type {
+  WebSocketClientConnectionProtocol,
+  WebSocketServerConnectionProtocol,
 } from '@mswjs/interceptors/WebSocket'
 
 const encoder = new Encoder()
@@ -23,14 +23,14 @@ type BoundMessageListener = (event: MessageEvent, ...data: Array<any>) => void
 class SocketIoConnection {
   constructor(
     private readonly connection:
-      | WebSocketClientConnection
-      | WebSocketServerConnection,
+      | WebSocketClientConnectionProtocol
+      | WebSocketServerConnectionProtocol,
   ) {}
 
   public on(event: string, listener: BoundMessageListener): void {
     const addEventListener = this.connection.addEventListener.bind(
       this.connection,
-    ) as WebSocketClientConnection['addEventListener']
+    ) as WebSocketClientConnectionProtocol['addEventListener']
 
     addEventListener('message', function (messageEvent) {
       const binaryType: BinaryType =
@@ -125,8 +125,8 @@ class SocketIoDuplexConnection {
   public server: SocketIoConnection
 
   constructor(
-    readonly rawClient: WebSocketClientConnection,
-    readonly rawServer: WebSocketServerConnection,
+    readonly rawClient: WebSocketClientConnectionProtocol,
+    readonly rawServer: WebSocketServerConnectionProtocol,
   ) {
     queueMicrotask(() => {
       try {
@@ -134,7 +134,7 @@ class SocketIoDuplexConnection {
         // throws if the actual server connection hasn't been established.
         // If it doesn't throw, don't mock the namespace approval message.
         // That becomes the responsibility of the server.
-        this.rawServer.socket.readyState
+        Reflect.get(this.rawServer, 'socket').readyState
         return
       } catch {
         this.rawClient.send(
@@ -165,6 +165,6 @@ class SocketIoDuplexConnection {
  *   })
  * })
  */
-export function toSocketIo(connection: WebSocketConnectionData) {
+export function toSocketIo(connection: WebSocketHandlerConnection) {
   return new SocketIoDuplexConnection(connection.client, connection.server)
 }

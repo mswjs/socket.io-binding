@@ -35,6 +35,10 @@ type ConnectionAuthorizer = (
   namespace: string,
   auth: Record<string, unknown>,
 ) => boolean | Promise<boolean>
+type EventEnvelope = {
+  event: string
+  namespace?: string
+}
 
 function createSocketIoMessageEvent(
   event: MessageEvent,
@@ -140,7 +144,13 @@ class SocketIoConnection {
     this.emit('message', ...data)
   }
 
-  public emit(event: string, ...data: Array<any>): void {
+  public emit(event: string, ...data: Array<any>): void
+  public emit(envelope: EventEnvelope, ...data: Array<any>): void
+  public emit(envelope: string | EventEnvelope, ...data: Array<any>): void {
+    const event = typeof envelope === 'string' ? envelope : envelope.event
+    const namespace =
+      typeof envelope === 'string' ? '/' : envelope.namespace ?? '/'
+
     /**
      * @todo Check if this correctly encodes Blob
      * and ArrayBuffer data.
@@ -150,7 +160,7 @@ class SocketIoConnection {
       /**
        * @todo Support custom namespaces.
        */
-      nsp: '/',
+      nsp: namespace,
       data: [event].concat(data),
     })
 

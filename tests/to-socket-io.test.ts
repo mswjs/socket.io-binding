@@ -180,3 +180,83 @@ it('modifies incoming server event', async () => {
     text: 'Hello, Sarah!',
   })
 })
+
+it('supports custom connection authorizers', async () => {
+  const { createSocketClient } = await import('./socket.io-client.js')
+
+  const forbiddenError = new DeferredPromise<Error>()
+
+  interceptor.on('connection', (connection) => {
+    const io = toSocketIo(connection)
+    io.setAuthorizer(() => false)
+  })
+
+  const ws = createSocketClient('wss://example.com')
+  ws.on('connect_error', (error) => {
+    forbiddenError.resolve(error)
+  })
+
+  const error = await forbiddenError
+  expect(error).toBeInstanceOf(Error)
+  expect(error.message).toBe('Not authorized')
+})
+
+it('intercepts custom outgoing client event on namespace', async () => {
+  const { createSocketClient } = await import('./socket.io-client.js')
+
+  let connectionNamespace: string | null = null
+  let eventNamespace: string | null = null
+  const eventLog: Array<WebSocketData> = []
+  const outgoingDataPromise = new DeferredPromise<WebSocketData>()
+
+  interceptor.on('connection', (connection) => {
+    connection.client.addEventListener('message', (event) => {
+      eventLog.push(event.data)
+    })
+
+    const io = toSocketIo(connection)
+    io.setAuthorizer((ns) => {
+      connectionNamespace = ns
+      return true
+    })
+
+    io.client.on('hello', (event, name) => {
+      eventNamespace = event.socketio.namespace
+      outgoingDataPromise.resolve(name)
+    })
+  })
+
+  const ws = createSocketClient('wss://example.com/foo')
+  ws.emit('hello', 'John')
+
+  // Must expose the decoded event payload.
+  expect(await outgoingDataPromise).toBe('John')
+
+  // Connection and event must have the expected namespace.
+  expect(connectionNamespace).toBe('/foo')
+  expect(eventNamespace).toBe('/foo')
+
+  // Must emit proper outgoing client messages.
+  expect(eventLog).toEqual(['40/foo,', '42/foo,["hello","John"]'])
+})
+
+it('sends a mocked custom incoming server event on a namespace', async () => {
+  const { createSocketClient } = await import('./socket.io-client.js')
+
+  const incomingDataPromise = new DeferredPromise<WebSocketData>()
+
+  interceptor.on('connection', (connection) => {
+    const { client } = toSocketIo(connection)
+
+    client.on('hello', (event, name) => {
+      client.emit({ event: 'greetings', namespace: '/foo' }, `Hello, ${name}!`)
+    })
+  })
+
+  const ws = createSocketClient('wss://example.com/foo')
+  ws.emit('hello', 'John')
+  ws.on('greetings', (message) => incomingDataPromise.resolve(message))
+
+  // Must emit proper outgoing server messages.
+  expect(await incomingDataPromise).toBe('Hello, John!')
+})

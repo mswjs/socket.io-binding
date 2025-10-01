@@ -10,5 +10,5 @@ import { Socket } from 'socket.io-client'
 import { io } from 'socket.io-client/dist/socket.io.js'
 
 export function createSocketClient(uri: string): Socket {
-  return io(uri, { transports: ['websocket'] })
+  return io(uri, { transports: ['websocket'], forceNew: true })
 }

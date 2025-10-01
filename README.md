@@ -30,9 +30,42 @@ interceptor.on('connection', (connection) => {
 
 > You can also use this package with [Mock Service Worker](https://github.com/mswjs/msw) directly.
 
+
+### Namespaces
+
+Every message delivered through the wrapper carries the namespace that it was sent on. Access it via `event.socketio.namespace` to make assertions or branch per namespace during tests:
+
+```js
+io.client.on('power_on', (event, deviceId) => {
+  if (event.socketio.namespace === '/bedroom/ceiling_fan') {
+    console.log('fan turned on:', deviceId)
+  }
+})
+```
+
+When mocking outgoing traffic with `emit()`, you can pass an object in the first argument to specify the namespace in addition to the event name:
+
+```js
+io.client.emit({ event: 'power_on', namespace: '/bedroom/ceiling_fan' })
+```
+
+By default, connections on all namespaces are accepted when a mocked server. This can be customized by setting a custom authorizer:
+
+```js
+interceptor.on('connection', (connection) => {
+  const io = toSocketIo(connection)
+  io.setAuthorizer((namespace) => {
+    return (namespace !== '/forbidden')
+  })
+})
+```
+
+Note that multiple Socket.IO namespaces will use a single underlying WebSocket, so this connection handler will only run once even if multiple Socket.IO sockets are created.
+
+
 ## Limitations
 
-This wrapper is not meant to provide full feature parity with the Socket.IO client API. Some features may be missing (like rooms, namespaces, broadcasting). If you rely of any of the missing features, open a pull request and implement it. Thank you.
+This wrapper is not meant to provide full feature parity with the Socket.IO client API. Some features may be missing (like rooms or broadcasting). If you rely of any of the missing features, open a pull request and implement it. Thank you.
 
 > Note that feature parity only concerns the _connection wrapper_. You can still use the entire of the Socket.IO feature set in the actual application code.
 

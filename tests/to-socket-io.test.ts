@@ -180,3 +180,23 @@ it('modifies incoming server event', async () => {
     text: 'Hello, Sarah!',
   })
 })
+
+it('supports custom connection authorizers', async () => {
+  const { createSocketClient } = await import('./socket.io-client.js')
+
+  const forbiddenError = new DeferredPromise<Error>()
+
+  interceptor.on('connection', (connection) => {
+    const io = toSocketIo(connection)
+    io.setAuthorizer(() => false)
+  })
+
+  const ws = createSocketClient('wss://example.com')
+  ws.on('connect_error', (error) => {
+    forbiddenError.resolve(error)
+  })
+
+  const error = await forbiddenError
+  expect(error).toBeInstanceOf(Error)
+  expect(error.message).toBe('Not authorized')
+})

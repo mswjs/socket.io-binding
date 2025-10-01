@@ -20,6 +20,10 @@ const encoder = new Encoder()
 const decoder = new Decoder()
 
 type BoundMessageListener = (event: MessageEvent, ...data: Array<any>) => void
+type ConnectionAuthorizer = (
+  namespace: string,
+  auth: Record<string, unknown>,
+) => boolean | Promise<boolean>
 
 class SocketIoConnection {
   constructor(
@@ -28,7 +32,7 @@ class SocketIoConnection {
       | WebSocketServerConnectionProtocol,
   ) {}
 
-  private _onSocketIoPacket(
+  public _onSocketIoPacket(
     callback: (messageEvent: MessageEvent, packet: SocketIoPacket) => void,
   ): void {
     const addEventListener = this.connection.addEventListener.bind(
@@ -133,34 +137,109 @@ class SocketIoDuplexConnection {
   public client: SocketIoConnection
   public server: SocketIoConnection
 
+  private hasAuthorizer = false
+
   constructor(
     readonly rawClient: WebSocketClientConnectionProtocol,
     readonly rawServer: WebSocketServerConnectionProtocol,
   ) {
     queueMicrotask(() => {
-      try {
-        // Accessing the "socket" property on the server
-        // throws if the actual server connection hasn't been established.
-        // If it doesn't throw, don't mock the namespace approval message.
-        // That becomes the responsibility of the server.
-        Reflect.get(this.rawServer, 'socket').readyState
-        return
-      } catch {
-        this.rawClient.send(
-          '0' +
-            JSON.stringify({
-              sid: 'test',
-              upgrades: [],
-              pingInterval: 25000,
-              pingTimeout: 5000,
-            }),
-        )
-        this.rawClient.send('40' + JSON.stringify({ sid: 'test' }))
+      // If the actual server connection hasn't been established yet, send
+      // a mock Engine.IO handshake.
+      if (!this.hasUpstreamServer()) {
+        // Set a default authorizer that always allows connections.
+        if (!this.hasAuthorizer) {
+          this.setAuthorizer(() => true)
+        }
+
+        this.sendMockEngineIoOpen()
       }
     })
 
     this.client = new SocketIoConnection(this.rawClient)
     this.server = new SocketIoConnection(this.rawServer)
+  }
+
+  private hasUpstreamServer(): boolean {
+    try {
+      // Accessing the "socket" property on the server throws if the actual
+      // server connection hasn't been established.
+      Reflect.get(this.rawServer, 'socket').readyState
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  public setAuthorizer(authorizer: ConnectionAuthorizer): void {
+    this.client._onSocketIoPacket((_event, packet) => {
+      if (packet.type !== SocketIoPacketType.CONNECT) {
+        return
+      }
+
+      Promise.resolve(authorizer(packet.nsp, packet.data)).then((allowed) => {
+        // Allow the authorizer to bounce connections before the actual server
+        // even sees it.
+        if (!allowed) {
+          this.sendMockSocketIoConnectError(packet.nsp, 'Not authorized')
+          return
+        }
+
+        this.sendMockSocketIoConnect(packet.nsp)
+      })
+    })
+
+    this.hasAuthorizer = true
+  }
+
+  private sendMockEngineIoOpen(): void {
+    const openPacket: EngineIoPacket = {
+      type: 'open',
+      data: JSON.stringify({
+        sid: 'test',
+        upgrades: [],
+        pingInterval: 25000,
+        pingTimeout: 5000,
+      }),
+    }
+
+    encodePayload([openPacket], (encodedPayload) => {
+      this.rawClient.send(encodedPayload)
+    })
+  }
+
+  private sendMockSocketIoConnect(namespace: string): void {
+    this.sendSocketIoPacket({
+      type: SocketIoPacketType.CONNECT,
+      nsp: namespace,
+      data: { sid: 'test' },
+    })
+  }
+
+  private sendMockSocketIoConnectError(
+    namespace: string,
+    message: string,
+  ): void {
+    this.sendSocketIoPacket({
+      type: SocketIoPacketType.CONNECT_ERROR,
+      nsp: namespace,
+      data: { message },
+    })
+  }
+
+  private sendSocketIoPacket(packet: SocketIoPacket): void {
+    const socketIoPackets = encoder.encode(packet)
+
+    const engineIoPackets = socketIoPackets.map<EngineIoPacket>((encoded) => {
+      return {
+        type: 'message',
+        data: encoded,
+      }
+    })
+
+    encodePayload(engineIoPackets, (encodedPayload) => {
+      this.rawClient.send(encodedPayload)
+    })
   }
 }
 

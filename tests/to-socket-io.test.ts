@@ -200,3 +200,33 @@ it('supports custom connection authorizers', async () => {
   expect(error).toBeInstanceOf(Error)
   expect(error.message).toBe('Not authorized')
 })
+
+it('intercepts outgoing client namespace connections', async () => {
+  const { createSocketClient } = await import('./socket.io-client.js')
+
+  let namespace: string | null = null
+  const eventLog: Array<WebSocketData> = []
+  const connectedPromise = new DeferredPromise<void>()
+
+
+  interceptor.on('connection', (connection) => {
+    connection.client.addEventListener('message', (event) => {
+      eventLog.push(event.data)
+    })
+
+    const io = toSocketIo(connection)
+    io.setAuthorizer((ns) => {
+      namespace = ns
+      return true
+    })
+  })
+
+  const ws = createSocketClient('wss://example.com/foo')
+  ws.on('connect', () => {
+    connectedPromise.resolve()
+  })
+
+  await connectedPromise
+  expect(namespace).toBe('/foo')
+  expect(eventLog).toEqual(['40/foo,'])
+})

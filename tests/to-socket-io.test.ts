@@ -201,13 +201,13 @@ it('supports custom connection authorizers', async () => {
   expect(error.message).toBe('Not authorized')
 })
 
-it('intercepts outgoing client namespace connections', async () => {
+it('intercepts custom outgoing client event on namespace', async () => {
   const { createSocketClient } = await import('./socket.io-client.js')
 
-  let namespace: string | null = null
+  let connectionNamespace: string | null = null
+  let eventNamespace: string | null = null
   const eventLog: Array<WebSocketData> = []
-  const connectedPromise = new DeferredPromise<void>()
-
+  const outgoingDataPromise = new DeferredPromise<WebSocketData>()
 
   interceptor.on('connection', (connection) => {
     connection.client.addEventListener('message', (event) => {
@@ -216,17 +216,26 @@ it('intercepts outgoing client namespace connections', async () => {
 
     const io = toSocketIo(connection)
     io.setAuthorizer((ns) => {
-      namespace = ns
+      connectionNamespace = ns
       return true
+    })
+
+    io.client.on('hello', (event, name) => {
+      eventNamespace = event.socketio.namespace
+      outgoingDataPromise.resolve(name)
     })
   })
 
   const ws = createSocketClient('wss://example.com/foo')
-  ws.on('connect', () => {
-    connectedPromise.resolve()
-  })
+  ws.emit('hello', 'John')
 
-  await connectedPromise
-  expect(namespace).toBe('/foo')
-  expect(eventLog).toEqual(['40/foo,'])
+  // Must expose the decoded event payload.
+  expect(await outgoingDataPromise).toBe('John')
+
+  // Connection and event must have the expected namespace.
+  expect(connectionNamespace).toBe('/foo')
+  expect(eventNamespace).toBe('/foo')
+
+  // Must emit proper outgoing client messages.
+  expect(eventLog).toEqual(['40/foo,', '42/foo,["hello","John"]'])
 })

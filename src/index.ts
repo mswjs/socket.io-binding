@@ -19,11 +19,44 @@ import type {
 const encoder = new Encoder()
 const decoder = new Decoder()
 
-type BoundMessageListener = (event: MessageEvent, ...data: Array<any>) => void
+interface SocketIoMessageDetails {
+  namespace: string
+}
+
+interface SocketIoMessageEvent<T = any> extends MessageEvent<T> {
+  socketio: SocketIoMessageDetails
+}
+
+type BoundMessageListener = (
+  event: SocketIoMessageEvent,
+  ...data: Array<any>
+) => void
 type ConnectionAuthorizer = (
   namespace: string,
   auth: Record<string, unknown>,
 ) => boolean | Promise<boolean>
+
+function createSocketIoMessageEvent(
+  event: MessageEvent,
+  details: SocketIoMessageDetails,
+): SocketIoMessageEvent {
+  return new Proxy(event, {
+    get(target, property, receiver) {
+      if (property === 'socketio') {
+        return details
+      }
+
+      return Reflect.get(target, property, receiver)
+    },
+    has(target, property) {
+      if (property === 'socketio') {
+        return true
+      }
+
+      return Reflect.has(target, property)
+    },
+  }) as SocketIoMessageEvent
+}
 
 class SocketIoConnection {
   constructor(
@@ -92,7 +125,13 @@ class SocketIoConnection {
       const [sentEvent, ...data] = decodedSocketIoPacket.data
 
       if (sentEvent === event) {
-        listener.call(undefined, messageEvent, ...data)
+        // Create a proxy wrapper around the original MessageEvent object,
+        // adding a `socketio` property with our namespace details.
+        const extendedEvent = createSocketIoMessageEvent(messageEvent, {
+          namespace: decodedSocketIoPacket.nsp,
+        })
+
+        listener.call(undefined, extendedEvent, ...data)
       }
     })
   }

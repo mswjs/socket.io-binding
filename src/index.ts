@@ -8,6 +8,7 @@ import {
   Encoder,
   Decoder,
   PacketType as SocketIoPacketType,
+  type Packet as SocketIoPacket,
 } from 'socket.io-parser'
 import type { WebSocketHandlerConnection } from 'msw'
 import type {
@@ -27,7 +28,9 @@ class SocketIoConnection {
       | WebSocketServerConnectionProtocol,
   ) {}
 
-  public on(event: string, listener: BoundMessageListener): void {
+  private _onSocketIoPacket(
+    callback: (messageEvent: MessageEvent, packet: SocketIoPacket) => void,
+  ): void {
     const addEventListener = this.connection.addEventListener.bind(
       this.connection,
     ) as WebSocketClientConnectionProtocol['addEventListener']
@@ -62,24 +65,30 @@ class SocketIoConnection {
 
       for (const packet of engineIoPackets) {
         decoder.once('decoded', (decodedSocketIoPacket) => {
-          /**
-           * @note Ignore any non-event messages.
-           * To forward all Socket.IO messages one must listen
-           * to the raw outgoing client events:
-           * client.on('message', (event) => server.send(event.data))
-           */
-          if (decodedSocketIoPacket.type !== SocketIoPacketType.EVENT) {
-            return
-          }
-
-          const [sentEvent, ...data] = decodedSocketIoPacket.data
-
-          if (sentEvent === event) {
-            listener.call(undefined, messageEvent, ...data)
-          }
+          callback(messageEvent, decodedSocketIoPacket)
         })
 
         decoder.add(packet.data)
+      }
+    })
+  }
+
+  public on(event: string, listener: BoundMessageListener): void {
+    this._onSocketIoPacket((messageEvent, decodedSocketIoPacket) => {
+      /**
+       * @note Ignore any non-event messages.
+       * To forward all Socket.IO messages one must listen
+       * to the raw outgoing client events:
+       * client.on('message', (event) => server.send(event.data))
+       */
+      if (decodedSocketIoPacket.type !== SocketIoPacketType.EVENT) {
+        return
+      }
+
+      const [sentEvent, ...data] = decodedSocketIoPacket.data
+
+      if (sentEvent === event) {
+        listener.call(undefined, messageEvent, ...data)
       }
     })
   }

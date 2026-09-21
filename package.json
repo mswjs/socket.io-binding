@@ -38,7 +38,7 @@
     "socket.io-parser": "^4.2.4"
   },
   "devDependencies": {
-    "@mswjs/interceptors": "^0.43.2",
+    "@mswjs/interceptors": "^0.44.0",
     "@open-draft/deferred-promise": "^2.2.0",
     "@open-draft/test-server": "^0.6.2",
     "@ossjs/release": "^0.8.1",

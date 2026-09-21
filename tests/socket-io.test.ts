@@ -1,18 +1,15 @@
 import http from 'node:http'
-import {
-  WebSocketInterceptor,
-  type WebSocketData,
-} from '@mswjs/interceptors/WebSocket'
+import { WebSocketInterceptor } from '@mswjs/interceptors/WebSocket'
 import { Server } from 'socket.io'
 import {
   createTestHttpServer,
   kServer,
   type TestHttpServer,
 } from '@epic-web/test-server/http'
-import { SocketIo } from '../src/index.js'
+import { SocketIo, type SocketIoMessage } from '../src/index.js'
 
 const interceptor = new WebSocketInterceptor({
-  protocols: [new SocketIo()],
+  extensions: [new SocketIo()],
 })
 
 function createSocketIoServer(httpServer: TestHttpServer): Server {
@@ -44,8 +41,8 @@ afterAll(() => {
 it('decodes outgoing client events', async () => {
   const { createSocketClient } = await import('./socket.io-client.js')
 
-  const eventLog: Array<WebSocketData> = []
-  const outgoingData = Promise.withResolvers<WebSocketData>()
+  const eventLog: Array<SocketIoMessage> = []
+  const outgoingData = Promise.withResolvers<SocketIoMessage>()
 
   interceptor.on('connection', ({ client }) => {
     client.addEventListener('message', (event) => {
@@ -55,34 +52,39 @@ it('decodes outgoing client events', async () => {
   })
 
   const ws = createSocketClient('wss://example.com')
+  onTestFinished(() => {
+    ws.close()
+  })
   ws.emit('hello', 'John')
 
-  await expect(outgoingData.promise).resolves.toBe('["hello","John"]')
+  await expect(outgoingData.promise).resolves.toEqual({
+    namespace: '/',
+    event: 'hello',
+    args: ['John'],
+  })
   expect(eventLog, 'exposes no protocol packets').toEqual([
-    '["hello","John"]',
+    { namespace: '/', event: 'hello', args: ['John'] },
   ])
 })
 
 it('encodes mocked incoming server events', async () => {
   const { createSocketClient } = await import('./socket.io-client.js')
 
-  const incomingData = Promise.withResolvers<WebSocketData>()
+  const incomingData = Promise.withResolvers<unknown>()
 
   interceptor.on('connection', ({ client }) => {
     client.addEventListener('message', (event) => {
-      if (typeof event.data !== 'string') {
-        return
-      }
-
-      const [name, firstName]: [string, string] = JSON.parse(event.data)
-
-      if (name === 'hello') {
-        client.send(JSON.stringify(['greetings', `Hello, ${firstName}!`]))
+      if (event.data.event === 'hello') {
+        const [firstName] = event.data.args
+        client.send({ event: 'greetings', args: [`Hello, ${firstName}!`] })
       }
     })
   })
 
   const ws = createSocketClient('wss://example.com')
+  onTestFinished(() => {
+    ws.close()
+  })
   ws.emit('hello', 'John')
   ws.on('greetings', (message) => incomingData.resolve(message))
 
@@ -93,10 +95,12 @@ it('decodes incoming server events', async () => {
   const { createSocketClient } = await import('./socket.io-client.js')
   await using httpServer = await createTestHttpServer()
   const wsServer = createSocketIoServer(httpServer)
-  onTestFinished(() => wsServer.close())
+  onTestFinished(() => {
+    wsServer.close()
+  })
 
-  const incomingServerData = Promise.withResolvers<WebSocketData>()
-  const incomingClientData = Promise.withResolvers<WebSocketData>()
+  const incomingServerData = Promise.withResolvers<SocketIoMessage>()
+  const incomingClientData = Promise.withResolvers<unknown>()
 
   wsServer.on('connection', (client) => {
     client.on('hello', (name) => {
@@ -113,6 +117,9 @@ it('decodes incoming server events', async () => {
   })
 
   const ws = createSocketClient(getWsUrl(httpServer))
+  onTestFinished(() => {
+    ws.close()
+  })
   ws.emit('hello', 'John')
   ws.on('greeting', (message) => {
     incomingClientData.resolve(message)
@@ -120,11 +127,15 @@ it('decodes incoming server events', async () => {
 
   await expect(
     incomingServerData.promise,
-    'the interceptor gets the decoded event'
-  ).resolves.toBe('["greeting",{"id":1,"text":"Hello, John!"}]')
+    'the interceptor gets the decoded event',
+  ).resolves.toEqual({
+    namespace: '/',
+    event: 'greeting',
+    args: [{ id: 1, text: 'Hello, John!' }],
+  })
   await expect(
     incomingClientData.promise,
-    'the Socket.IO client gets the original event'
+    'the Socket.IO client gets the original event',
   ).resolves.toEqual({
     id: 1,
     text: 'Hello, John!',
@@ -135,10 +146,12 @@ it('modifies incoming server events', async () => {
   const { createSocketClient } = await import('./socket.io-client.js')
   await using httpServer = await createTestHttpServer()
   const wsServer = createSocketIoServer(httpServer)
-  onTestFinished(() => wsServer.close())
+  onTestFinished(() => {
+    wsServer.close()
+  })
 
-  const incomingServerData = Promise.withResolvers<WebSocketData>()
-  const incomingClientData = Promise.withResolvers<WebSocketData>()
+  const incomingServerData = Promise.withResolvers<SocketIoMessage>()
+  const incomingClientData = Promise.withResolvers<unknown>()
 
   wsServer.on('connection', (client) => {
     client.on('hello', (name) => {
@@ -153,11 +166,17 @@ it('modifies incoming server events', async () => {
       incomingServerData.resolve(event.data)
 
       event.preventDefault()
-      client.send(JSON.stringify(['greeting', { id: 2, text: 'Hello, Sarah!' }]))
+      client.send({
+        event: 'greeting',
+        args: [{ id: 2, text: 'Hello, Sarah!' }],
+      })
     })
   })
 
   const ws = createSocketClient(getWsUrl(httpServer))
+  onTestFinished(() => {
+    ws.close()
+  })
   ws.emit('hello', 'John')
   ws.on('greeting', (message) => {
     incomingClientData.resolve(message)
@@ -165,13 +184,130 @@ it('modifies incoming server events', async () => {
 
   await expect(
     incomingServerData.promise,
-    'the interceptor gets the original event'
-  ).resolves.toBe('["greeting",{"id":1,"text":"Hello, John!"}]')
+    'the interceptor gets the original event',
+  ).resolves.toEqual({
+    namespace: '/',
+    event: 'greeting',
+    args: [{ id: 1, text: 'Hello, John!' }],
+  })
   await expect(
     incomingClientData.promise,
-    'the Socket.IO client gets the modified event'
+    'the Socket.IO client gets the modified event',
   ).resolves.toEqual({
     id: 2,
     text: 'Hello, Sarah!',
   })
+})
+
+it('exchanges events on a custom namespace', async () => {
+  const { createSocketClient } = await import('./socket.io-client.js')
+
+  const outgoingData = Promise.withResolvers<SocketIoMessage>()
+  const incomingData = Promise.withResolvers<unknown>()
+
+  interceptor.on('connection', ({ client }) => {
+    client.addEventListener('message', (event) => {
+      outgoingData.resolve(event.data)
+
+      if (event.data.event === 'hello') {
+        client.send({
+          namespace: event.data.namespace,
+          event: 'greetings',
+          args: ['Hello from /admin!'],
+        })
+      }
+    })
+  })
+
+  const ws = createSocketClient('wss://example.com/admin')
+  onTestFinished(() => {
+    ws.close()
+  })
+  ws.emit('hello', 'John')
+  ws.on('greetings', (message) => incomingData.resolve(message))
+
+  await expect(outgoingData.promise).resolves.toEqual({
+    namespace: '/admin',
+    event: 'hello',
+    args: ['John'],
+  })
+  await expect(incomingData.promise).resolves.toBe('Hello from /admin!')
+})
+
+it('sends events to every connection in a room', async () => {
+  const { createSocketClient } = await import('./socket.io-client.js')
+
+  const firstIncomingData = Promise.withResolvers<unknown>()
+  const secondIncomingData = Promise.withResolvers<unknown>()
+
+  interceptor.on('connection', ({ client, rooms }) => {
+    client.addEventListener('message', (event) => {
+      const [room] = event.data.args
+
+      if (event.data.event === 'join' && typeof room === 'string') {
+        rooms.join(room)
+      }
+
+      if (event.data.event === 'announce' && typeof room === 'string') {
+        rooms.to(room).send({ event: 'news', args: ['hello lobby'] })
+      }
+    })
+  })
+
+  const first = createSocketClient('wss://example.com')
+  onTestFinished(() => {
+    first.close()
+  })
+  const second = createSocketClient('wss://example.com')
+  onTestFinished(() => {
+    second.close()
+  })
+  first.on('news', (message) => firstIncomingData.resolve(message))
+  second.on('news', (message) => secondIncomingData.resolve(message))
+
+  first.emit('join', 'lobby')
+  second.emit('join', 'lobby')
+  second.emit('announce', 'lobby')
+
+  await expect(firstIncomingData.promise).resolves.toBe('hello lobby')
+  await expect(secondIncomingData.promise).resolves.toBe('hello lobby')
+})
+
+it('does not send room events to connections outside the room', async () => {
+  const { createSocketClient } = await import('./socket.io-client.js')
+
+  const memberIncomingData = Promise.withResolvers<unknown>()
+  const onOutsiderData = vi.fn<(message: unknown) => void>()
+
+  interceptor.on('connection', ({ client, rooms }) => {
+    client.addEventListener('message', (event) => {
+      const [room] = event.data.args
+
+      if (event.data.event === 'join' && typeof room === 'string') {
+        rooms.join(room)
+      }
+
+      if (event.data.event === 'announce' && typeof room === 'string') {
+        rooms.to(room).send({ event: 'news', args: ['hello lobby'] })
+      }
+    })
+  })
+
+  const member = createSocketClient('wss://example.com')
+  onTestFinished(() => {
+    member.close()
+  })
+  const outsider = createSocketClient('wss://example.com')
+  onTestFinished(() => {
+    outsider.close()
+  })
+  member.on('news', (message) => memberIncomingData.resolve(message))
+  outsider.on('news', onOutsiderData)
+
+  member.emit('join', 'lobby')
+  outsider.emit('join', 'elsewhere')
+  member.emit('announce', 'lobby')
+
+  await expect(memberIncomingData.promise).resolves.toBe('hello lobby')
+  expect(onOutsiderData).not.toHaveBeenCalled()
 })

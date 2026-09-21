@@ -2,7 +2,7 @@
   "type": "module",
   "name": "@mswjs/socket.io-binding",
   "version": "0.2.0",
-  "description": "WebSocket codec to mock Socket.IO connections with Mock Service Worker",
+  "description": "WebSocket extension to mock Socket.IO connections with Interceptors and Mock Service Worker",
   "exports": {
     ".": {
       "types": "./build/index.d.ts",

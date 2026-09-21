@@ -1,170 +1,161 @@
 import {
-  encodePayload,
-  decodePayload,
+  encodePacket,
+  decodePacket,
   type Packet as EngineIoPacket,
-  type BinaryType,
 } from 'engine.io-parser'
 import {
   Encoder,
   Decoder,
-  PacketType as SocketIoPacketType,
+  PacketType,
+  type Packet as SocketIoPacket,
 } from 'socket.io-parser'
-import type { WebSocketHandlerConnection } from 'msw'
-import type {
-  WebSocketClientConnectionProtocol,
-  WebSocketServerConnectionProtocol,
+import {
+  WebSocketProtocol,
+  type WebSocketData,
+  type WebSocketProtocolContext,
+  type WebSocketProtocolMessageContext,
 } from '@mswjs/interceptors/WebSocket'
 
+const SESSION_ID = 'test'
+
+/**
+ * @note Advertise a heartbeat the client will never expect within
+ * the lifetime of a test (the sum stays below the timer ceiling of 2^31 ms).
+ * The client drops the connection unless it receives a ping within
+ * `pingInterval + pingTimeout`, and a mocked server has no reason to ping.
+ */
+const PING_INTERVAL = 2_000_000_000
+const PING_TIMEOUT = 100_000_000
+
 const encoder = new Encoder()
-const decoder = new Decoder()
 
-type BoundMessageListener = (event: MessageEvent, ...data: Array<any>) => void
+function encodeEngineIoPacket(packet: EngineIoPacket): string {
+  let encodedPacket = ''
 
-class SocketIoConnection {
-  constructor(
-    private readonly connection:
-      | WebSocketClientConnectionProtocol
-      | WebSocketServerConnectionProtocol,
-  ) {}
+  // The callback is invoked synchronously for text packets.
+  encodePacket(packet, false, (result) => {
+    if (typeof result === 'string') {
+      encodedPacket = result
+    }
+  })
 
-  public on(event: string, listener: BoundMessageListener): void {
-    const addEventListener = this.connection.addEventListener.bind(
-      this.connection,
-    ) as WebSocketClientConnectionProtocol['addEventListener']
+  return encodedPacket
+}
 
-    addEventListener('message', function (messageEvent) {
-      const binaryType: BinaryType =
-        this.binaryType === 'blob'
-          ? this.binaryType
-          : typeof Buffer === 'undefined'
-          ? 'arraybuffer'
-          : 'nodebuffer'
+function encodeSocketIoPacket(packet: SocketIoPacket): string {
+  const [encodedPacket] = encoder.encode(packet)
 
-      const rawData = messageEvent.data
-
-      /**
-       * Messages are always decoded as strings.
-       * Technically, it should be safe to skip non-string messages.
-       */
-      if (typeof rawData !== 'string') {
-        return
-      }
-
-      const engineIoPackets = decodePayload(rawData, binaryType)
-
-      /**
-       * @todo Check if this works correctly with
-       * Blob and ArrayBuffer data.
-       */
-      if (engineIoPackets.every((packet) => packet.type !== 'message')) {
-        return
-      }
-
-      for (const packet of engineIoPackets) {
-        decoder.once('decoded', (decodedSocketIoPacket) => {
-          /**
-           * @note Ignore any non-event messages.
-           * To forward all Socket.IO messages one must listen
-           * to the raw outgoing client events:
-           * client.on('message', (event) => server.send(event.data))
-           */
-          if (decodedSocketIoPacket.type !== SocketIoPacketType.EVENT) {
-            return
-          }
-
-          const [sentEvent, ...data] = decodedSocketIoPacket.data
-
-          if (sentEvent === event) {
-            listener.call(undefined, messageEvent, ...data)
-          }
-        })
-
-        decoder.add(packet.data)
-      }
-    })
+  if (typeof encodedPacket !== 'string') {
+    throw new Error('Binary Socket.IO packets are not supported')
   }
 
-  public send(...data: Array<any>): void {
-    this.emit('message', ...data)
+  return encodeEngineIoPacket({ type: 'message', data: encodedPacket })
+}
+
+/**
+ * The Socket.IO protocol over WebSocket.
+ *
+ * Messages are Socket.IO events as JSON text: `'["event", ...args]'`.
+ * The Engine.IO session and the protocol control packets are handled
+ * by the protocol and never surface. Binary attachments are not supported.
+ *
+ * @example
+ * // With Interceptors: applied to every Socket.IO connection.
+ * new WebSocketInterceptor({ protocols: [new SocketIo()] })
+ *
+ * @example
+ * // With Mock Service Worker: applied to the connections of this link.
+ * const chat = ws.link('wss://example.com/chat', { protocol: new SocketIo() })
+ *
+ * chat.addEventListener('connection', ({ client }) => {
+ *   client.addEventListener('message', (event) => {
+ *     const [name, ...args] = JSON.parse(event.data)
+ *   })
+ *   client.send(JSON.stringify(['greeting', 'Hello, John!']))
+ * })
+ */
+export class SocketIo extends WebSocketProtocol<string> {
+  /**
+   * The Socket.IO decoder is stateful (binary attachments span
+   * multiple frames), so keep one per connection.
+   */
+  private readonly decoders = new WeakMap<object, Decoder>()
+
+  public match({ client }: WebSocketProtocolContext): boolean {
+    return client.url.searchParams.has('EIO')
   }
 
-  public emit(event: string, ...data: Array<any>): void {
-    /**
-     * @todo Check if this correctly encodes Blob
-     * and ArrayBuffer data.
-     */
-    const encodedSocketIoPacket = encoder.encode({
-      type: SocketIoPacketType.EVENT,
+  public encode(message: string): string {
+    return encodeSocketIoPacket({
+      type: PacketType.EVENT,
       /**
        * @todo Support custom namespaces.
        */
       nsp: '/',
-      data: [event].concat(data),
-    })
-
-    const engineIoPackets = encodedSocketIoPacket.map<EngineIoPacket>(
-      (packet) => {
-        return {
-          type: 'message',
-          data: packet,
-        }
-      },
-    )
-
-    // Encode the payload in multiple sends
-    // because Socket.IO represents Blob/Buffer
-    // data with 2 "message" events dispatched.
-    encodePayload(engineIoPackets, (encodedPayload) => {
-      this.connection.send(encodedPayload)
+      data: JSON.parse(message),
     })
   }
-}
 
-class SocketIoDuplexConnection {
-  public client: SocketIoConnection
-  public server: SocketIoConnection
+  public decode(
+    frame: WebSocketData,
+    { connection }: WebSocketProtocolMessageContext,
+  ): Iterator<string> | undefined {
+    // Messages are always decoded as strings.
+    if (typeof frame !== 'string') {
+      return
+    }
 
-  constructor(
-    readonly rawClient: WebSocketClientConnectionProtocol,
-    readonly rawServer: WebSocketServerConnectionProtocol,
-  ) {
-    queueMicrotask(() => {
-      try {
-        // Accessing the "socket" property on the server
-        // throws if the actual server connection hasn't been established.
-        // If it doesn't throw, don't mock the namespace approval message.
-        // That becomes the responsibility of the server.
-        Reflect.get(this.rawServer, 'socket').readyState
-        return
-      } catch {
-        this.rawClient.send(
-          '0' +
-            JSON.stringify({
-              sid: 'test',
-              upgrades: [],
-              pingInterval: 25000,
-              pingTimeout: 5000,
-            }),
-        )
-        this.rawClient.send('40' + JSON.stringify({ sid: 'test' }))
+    const packet = decodePacket(frame, 'arraybuffer')
+
+    // Ignore the Engine.IO control packets (open, ping, pong, etc).
+    if (packet.type !== 'message') {
+      return
+    }
+
+    const decoder = this.#getDecoder(connection)
+    const events: Array<string> = []
+    const collectEvent = (socketIoPacket: SocketIoPacket) => {
+      // Ignore the Socket.IO control packets (connect, ack, etc).
+      if (socketIoPacket.type === PacketType.EVENT) {
+        events.push(JSON.stringify(socketIoPacket.data))
       }
+    }
+
+    decoder.on('decoded', collectEvent)
+    decoder.add(packet.data)
+    decoder.off('decoded', collectEvent)
+
+    return events.values()
+  }
+
+  public *handshake(): Generator<string> {
+    // Establish the Engine.IO session.
+    yield encodeEngineIoPacket({
+      type: 'open',
+      data: JSON.stringify({
+        sid: SESSION_ID,
+        upgrades: [],
+        pingInterval: PING_INTERVAL,
+        pingTimeout: PING_TIMEOUT,
+      }),
     })
 
-    this.client = new SocketIoConnection(this.rawClient)
-    this.server = new SocketIoConnection(this.rawServer)
+    // Approve the connection to the default namespace.
+    yield encodeSocketIoPacket({
+      type: PacketType.CONNECT,
+      nsp: '/',
+      data: { sid: SESSION_ID },
+    })
   }
-}
 
-/**
- * @example
- * interceptor.on('connection', (connection) => {
- *   const { client, server } = toSocketIo(connection)
- *
- *   client.on('hello', (firstName) => {
- *     client.emit('greetings', `Hello, ${firstName}!`)
- *   })
- * })
- */
-export function toSocketIo(connection: WebSocketHandlerConnection) {
-  return new SocketIoDuplexConnection(connection.client, connection.server)
+  #getDecoder(connection: object): Decoder {
+    let decoder = this.decoders.get(connection)
+
+    if (!decoder) {
+      decoder = new Decoder()
+      this.decoders.set(connection, decoder)
+    }
+
+    return decoder
+  }
 }

@@ -1,40 +1,12 @@
 ## `@mswjs/socket.io-binding`
 
+The Socket.IO protocol as a WebSocket protocol for [`@mswjs/interceptors`](https://github.com/mswjs/interceptors) and [Mock Service Worker](https://github.com/mswjs/msw). Apply it to intercepted WebSocket connections to work with Socket.IO events instead of the raw Engine.IO/Socket.IO frames.
+
 ## Motivation
 
-This package is intended as a wrapper over the `WebSocketInterceptor` from [`@mswjs/interceptors`](https://github.com/mswjs/interceptors). It provides automatic encoding and decoding of messages, letting you work with the Socket.IO clients and servers as you are used to.
+Socket.IO implements its own protocol on top of WebSocket: a session handshake, a heartbeat, and a packet framing. Without the protocol, an intercepted connection exposes the raw frames (e.g. `40`, `42["hello","John"]`), expects you to send them back the same way, and never completes the handshake a mocked Socket.IO client waits for. With the protocol, the connection speaks Socket.IO events, and the session is established for you.
 
-```js
-import { WebSocketInterceptor } from '@mswjs/interceptors'
-import { toSocketIo } from '@mswjs/socket.io-binding'
-
-const interceptor = new WebSocketInterceptor()
-
-interceptor.on('connection', (connection) => {
-  connection.client.addEventListener('message', (event) => {
-    // Socket.IO implements their custom messaging protocol.
-    // This means that the "raw" event data you get will be
-    // encoded: e.g. "40", "42['message', 'Hello, John!']".
-    console.log(event.data)
-  })
-
-  const io = toSocketIo(connection)
-
-  io.client.on('greeting', (event, message) => {
-    // Using the wrapper, you get the decoded messages,
-    // as well as support for custom event listeners.
-    console.log(message) // "Hello, John!"
-  })
-})
-```
-
-> You can also use this package with [Mock Service Worker](https://github.com/mswjs/msw) directly.
-
-## Limitations
-
-This wrapper is not meant to provide full feature parity with the Socket.IO client API. Some features may be missing (like rooms, namespaces, broadcasting). If you rely of any of the missing features, open a pull request and implement it. Thank you.
-
-> Note that feature parity only concerns the _connection wrapper_. You can still use the entire of the Socket.IO feature set in the actual application code.
+An event is represented as the JSON text of its `[event, ...args]` tuple.
 
 ## Install
 
@@ -42,23 +14,49 @@ This wrapper is not meant to provide full feature parity with the Socket.IO clie
 npm install @mswjs/socket.io-binding
 ```
 
-## Examples
+## Usage
 
-### Using with Mock Service Worker
+### With Mock Service Worker
 
 ```js
 import { ws } from 'msw'
-import { toSocketIo } from '@mswjs/socket.io-binding'
+import { SocketIo } from '@mswjs/socket.io-binding'
 
-const chat = ws.link('wss://example.com/chat')
+const chat = ws.link('wss://example.com/chat', { protocol: new SocketIo() })
 
 export const handlers = [
-  chat.addEventListener('connection', (connection) => {
-    const io = toSocketIo(connection)
+  chat.addEventListener('connection', ({ client }) => {
+    client.addEventListener('message', (event) => {
+      const [name, firstName] = JSON.parse(event.data)
 
-    io.on('hello', (event, name) => {
-      console.log('client sent hello:', name)
+      if (name === 'hello') {
+        client.send(JSON.stringify(['greeting', `Hello, ${firstName}!`]))
+      }
     })
   }),
 ]
 ```
+
+### With Interceptors
+
+The protocol recognizes Socket.IO connections by their URL, so it applies to them automatically.
+
+```js
+import { WebSocketInterceptor } from '@mswjs/interceptors/WebSocket'
+import { SocketIo } from '@mswjs/socket.io-binding'
+
+const interceptor = new WebSocketInterceptor({
+  protocols: [new SocketIo()],
+})
+
+interceptor.on('connection', ({ server }) => {
+  server.connect()
+  server.addEventListener('message', (event) => {
+    console.log(event.data) // '["greeting","Hello, John!"]'
+  })
+})
+```
+
+## Limitations
+
+The protocol supports the default namespace and text events only. Custom namespaces, acknowledgements, and binary attachments are not supported. If you rely on any of these, open a pull request and implement them. Thank you.

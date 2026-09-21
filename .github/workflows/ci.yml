@@ -17,13 +17,19 @@ jobs:
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9.14.0
+          version: 11.1.1
 
       - name: Install dependencies
         run: pnpm install
 
+      - name: Lint
+        run: pnpm lint
+
       - name: Build
         run: pnpm build
+
+      - name: Publint
+        run: pnpm publint
 
       - name: Type tests
         run: pnpm test:ts

@@ -1,57 +1,63 @@
-// @vitest-environment node-websocket
+import http from 'node:http'
 import {
   WebSocketInterceptor,
   type WebSocketData,
 } from '@mswjs/interceptors/WebSocket'
 import { Server } from 'socket.io'
-import { HttpServer } from '@open-draft/test-server/http'
-import { DeferredPromise } from '@open-draft/deferred-promise'
+import {
+  createTestHttpServer,
+  kServer,
+  type TestHttpServer,
+} from '@epic-web/test-server/http'
 import { SocketIo } from '../src/index.js'
 
 const interceptor = new WebSocketInterceptor({
   protocols: [new SocketIo()],
 })
 
-const httpServer = new HttpServer()
-const wsServer = new Server(httpServer['_http'])
+function createSocketIoServer(httpServer: TestHttpServer): Server {
+  const rawServer: unknown = Reflect.get(httpServer.http, kServer)
+  if (!(rawServer instanceof http.Server)) {
+    throw new Error('Expected the test server to be an "http.Server" instance')
+  }
+  return new Server(rawServer)
+}
 
-function getWsUrl(): string {
-  const url = new URL(httpServer.http.address.href)
+function getWsUrl(httpServer: TestHttpServer): string {
+  const url = httpServer.http.url()
   url.protocol = url.protocol.replace('http', 'ws')
   return url.href
 }
 
-beforeAll(async () => {
+beforeAll(() => {
   interceptor.apply()
-  await httpServer.listen()
 })
 
 afterEach(() => {
   interceptor.removeAllListeners()
 })
 
-afterAll(async () => {
+afterAll(() => {
   interceptor.dispose()
-  await httpServer.close()
 })
 
 it('decodes outgoing client events', async () => {
   const { createSocketClient } = await import('./socket.io-client.js')
 
   const eventLog: Array<WebSocketData> = []
-  const outgoingDataPromise = new DeferredPromise<WebSocketData>()
+  const outgoingData = Promise.withResolvers<WebSocketData>()
 
   interceptor.on('connection', ({ client }) => {
     client.addEventListener('message', (event) => {
       eventLog.push(event.data)
-      outgoingDataPromise.resolve(event.data)
+      outgoingData.resolve(event.data)
     })
   })
 
   const ws = createSocketClient('wss://example.com')
   ws.emit('hello', 'John')
 
-  await expect(outgoingDataPromise).resolves.toBe('["hello","John"]')
+  await expect(outgoingData.promise).resolves.toBe('["hello","John"]')
   expect(eventLog, 'exposes no protocol packets').toEqual([
     '["hello","John"]',
   ])
@@ -60,7 +66,7 @@ it('decodes outgoing client events', async () => {
 it('encodes mocked incoming server events', async () => {
   const { createSocketClient } = await import('./socket.io-client.js')
 
-  const incomingDataPromise = new DeferredPromise<WebSocketData>()
+  const incomingData = Promise.withResolvers<WebSocketData>()
 
   interceptor.on('connection', ({ client }) => {
     client.addEventListener('message', (event) => {
@@ -78,16 +84,19 @@ it('encodes mocked incoming server events', async () => {
 
   const ws = createSocketClient('wss://example.com')
   ws.emit('hello', 'John')
-  ws.on('greetings', (message) => incomingDataPromise.resolve(message))
+  ws.on('greetings', (message) => incomingData.resolve(message))
 
-  await expect(incomingDataPromise).resolves.toBe('Hello, John!')
+  await expect(incomingData.promise).resolves.toBe('Hello, John!')
 })
 
 it('decodes incoming server events', async () => {
   const { createSocketClient } = await import('./socket.io-client.js')
+  await using httpServer = await createTestHttpServer()
+  const wsServer = createSocketIoServer(httpServer)
+  onTestFinished(() => wsServer.close())
 
-  const incomingServerDataPromise = new DeferredPromise<WebSocketData>()
-  const incomingClientDataPromise = new DeferredPromise<WebSocketData>()
+  const incomingServerData = Promise.withResolvers<WebSocketData>()
+  const incomingClientData = Promise.withResolvers<WebSocketData>()
 
   wsServer.on('connection', (client) => {
     client.on('hello', (name) => {
@@ -99,22 +108,22 @@ it('decodes incoming server events', async () => {
     server.connect()
 
     server.addEventListener('message', (event) => {
-      incomingServerDataPromise.resolve(event.data)
+      incomingServerData.resolve(event.data)
     })
   })
 
-  const ws = createSocketClient(getWsUrl())
+  const ws = createSocketClient(getWsUrl(httpServer))
   ws.emit('hello', 'John')
   ws.on('greeting', (message) => {
-    incomingClientDataPromise.resolve(message)
+    incomingClientData.resolve(message)
   })
 
   await expect(
-    incomingServerDataPromise,
+    incomingServerData.promise,
     'the interceptor gets the decoded event'
   ).resolves.toBe('["greeting",{"id":1,"text":"Hello, John!"}]')
   await expect(
-    incomingClientDataPromise,
+    incomingClientData.promise,
     'the Socket.IO client gets the original event'
   ).resolves.toEqual({
     id: 1,
@@ -124,9 +133,12 @@ it('decodes incoming server events', async () => {
 
 it('modifies incoming server events', async () => {
   const { createSocketClient } = await import('./socket.io-client.js')
+  await using httpServer = await createTestHttpServer()
+  const wsServer = createSocketIoServer(httpServer)
+  onTestFinished(() => wsServer.close())
 
-  const incomingServerDataPromise = new DeferredPromise<WebSocketData>()
-  const incomingClientDataPromise = new DeferredPromise<WebSocketData>()
+  const incomingServerData = Promise.withResolvers<WebSocketData>()
+  const incomingClientData = Promise.withResolvers<WebSocketData>()
 
   wsServer.on('connection', (client) => {
     client.on('hello', (name) => {
@@ -138,25 +150,25 @@ it('modifies incoming server events', async () => {
     server.connect()
 
     server.addEventListener('message', (event) => {
-      incomingServerDataPromise.resolve(event.data)
+      incomingServerData.resolve(event.data)
 
       event.preventDefault()
       client.send(JSON.stringify(['greeting', { id: 2, text: 'Hello, Sarah!' }]))
     })
   })
 
-  const ws = createSocketClient(getWsUrl())
+  const ws = createSocketClient(getWsUrl(httpServer))
   ws.emit('hello', 'John')
   ws.on('greeting', (message) => {
-    incomingClientDataPromise.resolve(message)
+    incomingClientData.resolve(message)
   })
 
   await expect(
-    incomingServerDataPromise,
+    incomingServerData.promise,
     'the interceptor gets the original event'
   ).resolves.toBe('["greeting",{"id":1,"text":"Hello, John!"}]')
   await expect(
-    incomingClientDataPromise,
+    incomingClientData.promise,
     'the Socket.IO client gets the modified event'
   ).resolves.toEqual({
     id: 2,

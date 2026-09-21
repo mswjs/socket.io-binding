@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.base.json",
-  "includes": ["tests"],
+  "include": ["tests"],
   "references": [{ "path": "./tsconfig.src.json" }],
   "compilerOptions": {
     "types": ["@types/node", "vitest/globals"]

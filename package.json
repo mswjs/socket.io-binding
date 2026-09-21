@@ -2,7 +2,7 @@
   "type": "module",
   "name": "@mswjs/socket.io-binding",
   "version": "0.2.0",
-  "description": "Binding to mock Socket.IO connections with Mock Service Worker",
+  "description": "WebSocket codec to mock Socket.IO connections with Mock Service Worker",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
   "scripts": {
@@ -30,14 +30,15 @@
   "author": "Artem Zakharchenko <kettanaito@gmail.com>",
   "license": "MIT",
   "peerDependencies": {
+    "@mswjs/interceptors": "^0.43.2",
     "msw": "^2.10.2"
   },
   "dependencies": {
-    "@mswjs/interceptors": "^0.39.2",
     "engine.io-parser": "^5.2.3",
     "socket.io-parser": "^4.2.4"
   },
   "devDependencies": {
+    "@mswjs/interceptors": "^0.44.0",
     "@open-draft/deferred-promise": "^2.2.0",
     "@open-draft/test-server": "^0.6.2",
     "@ossjs/release": "^0.8.1",

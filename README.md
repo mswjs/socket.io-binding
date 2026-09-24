@@ -6,7 +6,7 @@ The Socket.IO protocol as a WebSocket extension for [`@mswjs/interceptors`](http
 
 Socket.IO implements its own protocol on top of WebSocket: a session handshake, a heartbeat, namespaces, acknowledgements, and a packet framing. Without the extension, an intercepted connection exposes the raw frames (e.g. `40`, `42["hello","John"]`), expects you to send them back the same way, and never completes the handshake a Socket.IO client waits for. With the extension, the connection speaks Socket.IO messages, and the session is established for you.
 
-> **Only WebSocket transports reach a WebSocket extension.** Connect the Socket.IO client with `transports: ['websocket']`. A client that starts with HTTP long-polling never gets here.
+> **Only Socket.IO clients that use the global `WebSocket` class as the transport are supported.** Socket.IO does not support injecting a transport for testing, so the client must be created with `transports: ['websocket']` (in the browser) or `transports: [WebSocket]` from `engine.io-client` (in Node.js, where the default `'websocket'` transport uses the `ws` package instead).
 
 ## Install
 
